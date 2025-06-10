@@ -1,14 +1,10 @@
-use defmt::{error, Format};
-use thiserror::Error;
-use esp_partition_table::NorFlashOpError;
-use core::result;
-use alloc::string::String;
-use embedded_storage::nor_flash::NorFlash;
-use embedded_storage::nor_flash::NorFlashErrorKind;
-use semver::Error as SemverError;
-use esp_partition_table::NorFlashOpError::PartitionError;
-use alloc::str::Utf8Error;
 use crate::alloc::string::ToString;
+use alloc::str::Utf8Error;
+use alloc::string::String;
+use defmt::error;
+use esp_partition_table::NorFlashOpError;
+use semver::Error as SemverError;
+use thiserror::Error;
 
 pub type Result<T> = core::result::Result<T, UpgradeError>;
 
@@ -59,14 +55,14 @@ impl From<()> for UpgradeError {
 impl<S: embedded_storage::nor_flash::ReadNorFlash> From<NorFlashOpError<S>> for UpgradeError {
     fn from(error: NorFlashOpError<S>) -> Self {
         match error {
-            NorFlashOpError::PartitionError(internal_error) => {
+            NorFlashOpError::PartitionError(_internal_error) => {
                 //error!("error message: {:?}", internal_error);
                 Self::FlashError
-            },
-            NorFlashOpError::StorageError(internal_error) => {
+            }
+            NorFlashOpError::StorageError(_internal_error) => {
                 //error!("error message: {:?}", internal_error);
                 Self::StorageError
-            },
+            }
         }
     }
 }
@@ -91,6 +87,5 @@ impl fmt::Display for OtaError {
             OtaError::InsufficientSpace => write!(f, "Insufficient space for update"),
         }
     }
-} 
+}
 */
-

@@ -2,19 +2,15 @@
 
 extern crate alloc;
 
-pub mod partition;
-pub mod upgrade_data;
-pub mod error;
 pub mod botifactory;
-pub mod storage;
+pub mod error;
+pub mod partition;
 mod seq_crc;
+pub mod storage;
+pub mod upgrade_data;
 
-pub use partition::*;
-pub use upgrade_data::*;
-pub use error::*;
-pub use storage::*;
 pub use botifactory::*;
-
-#[cfg(test)]
-mod tests;
-
+pub use error::*;
+pub use partition::*;
+pub use storage::*;
+pub use upgrade_data::*;

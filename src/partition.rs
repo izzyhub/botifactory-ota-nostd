@@ -1,32 +1,34 @@
-use embedded_storage::nor_flash::NorFlash;
-use esp_partition_table::{PartitionEntry, AppPartitionType,DataPartitionType, PartitionTable, PartitionType};
 use crate::error::{Result, UpgradeError};
-use crate::upgrade_data::UpgradeInfo;
-use defmt::{debug, info};
+use embedded_storage::nor_flash::NorFlash;
+use esp_partition_table::{AppPartitionType, PartitionEntry, PartitionTable, PartitionType};
+//use defmt::{debug, info};
 
 pub fn find_ota_partition<S: NorFlash>(storage: &mut S) -> Result<PartitionEntry> {
     let table = PartitionTable::default();
 
-    for partition in table.iter_nor_flash(storage, false) {
-        if let Ok(partition) = partition {
-            if let PartitionType::App(AppPartitionType::Ota(_)) = partition.type_ {
-                return Ok(partition);
-            }
+    for partition in table.iter_nor_flash(storage, false).flatten() {
+        if let PartitionType::App(AppPartitionType::Ota(_)) = partition.type_ {
+            return Ok(partition);
         }
     }
 
     Err(UpgradeError::PartitionNotFound)
 }
 
-pub fn find_running_partition<S: NorFlash>(
-    storage: &mut S, seq: u32) -> Result<PartitionEntry> {
+pub fn find_running_partition<S: NorFlash>(storage: &mut S, seq: u32) -> Result<PartitionEntry> {
     let parition_number = (seq % 2) as u8;
-    find_partition_by_type(storage, PartitionType::App(AppPartitionType::Ota(parition_number)))
+    find_partition_by_type(
+        storage,
+        PartitionType::App(AppPartitionType::Ota(parition_number)),
+    )
 }
 
 pub fn find_inactive_partition<S: NorFlash>(storage: &mut S, seq: u32) -> Result<PartitionEntry> {
     let parition_number = ((seq - 1) % 2) as u8;
-    find_partition_by_type(storage, PartitionType::App(AppPartitionType::Ota(parition_number)))
+    find_partition_by_type(
+        storage,
+        PartitionType::App(AppPartitionType::Ota(parition_number)),
+    )
 }
 
 /// Find partition entry by type
@@ -47,10 +49,7 @@ pub fn find_partition_by_type<S: NorFlash>(
 }
 
 /// Find partition entry by name
-pub fn find_partition_by_name<S: NorFlash>(
-    storage: &mut S,
-    name: &str
-) -> Result<PartitionEntry> {
+pub fn find_partition_by_name<S: NorFlash>(storage: &mut S, name: &str) -> Result<PartitionEntry> {
     let table = PartitionTable::default();
 
     for entry in table.iter_nor_flash(storage, false) {
@@ -61,4 +60,3 @@ pub fn find_partition_by_name<S: NorFlash>(
     }
     Err(UpgradeError::PartitionNotFound)
 }
-

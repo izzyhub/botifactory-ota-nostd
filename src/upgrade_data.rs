@@ -1,36 +1,32 @@
-use alloc::string::String;
 use crate::error::{Result, UpgradeError};
-use alloc::format;
-use semver::Version;
-use alloc::vec::Vec;
-use crate::seq_crc::esp_crc;
-use embedded_storage::nor_flash::NorFlash;
 use crate::partition::find_ota_partition;
+use crate::seq_crc::esp_crc;
 use alloc::fmt::Display;
 use core::fmt::Formatter;
+use defmt::Format;
+use embedded_storage::nor_flash::NorFlash;
 
 const SECTOR_SIZE: usize = 0x1000;
 
-
-/// These aren't really arbitrary/crate invented states. 
+/// These aren't really arbitrary/crate invented states.
 /// They come from the espressive bootloader
 /// [documented here](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/ota.html)
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Format, Copy, Clone, Eq, PartialEq)]
 pub enum AppOTAState {
-    /// Monitor the first boot. 
+    /// Monitor the first boot.
     /// In bootloader this state is changed to ESP_OTA_IMG_PENDING_VERIFY.
-    New,         
-    /// First boot for this app was. 
+    New,
+    /// First boot for this app was.
     /// If while the second boot this state is then it will be changed to ABORTED.
-    PendingVerify,         
-    /// App was confirmed as workable. 
+    PendingVerify,
+    /// App was confirmed as workable.
     /// App can boot and work without limits.
     Valid,
-    /// App was confirmed as non-workable. 
+    /// App was confirmed as non-workable.
     /// This app will not selected to boot at all.
-    Invalid,         
+    Invalid,
     /// App could not confirm the workable or non-workable.
-    /// In bootloader PendingVerify state will be changed to 
+    /// In bootloader PendingVerify state will be changed to
     /// Aborted. This app will not be selected to boot at all
     Aborted,
     /// Undefined. App can boot and work without limits.
@@ -65,7 +61,6 @@ impl From<AppOTAState> for u32 {
     }
 }
 
-
 /// Also not arbitrary. Based on what the esp32 bootloader uses.
 /// [documented here](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/ota.html)
 #[derive(Debug, Clone, Copy)]
@@ -73,7 +68,7 @@ pub struct UpgradeInfo {
     pub seq: u32,
     pub label: [u8; 20],
     pub state: AppOTAState,
-    /// CRC32 of ota_seq field only 
+    /// CRC32 of ota_seq field only
     pub seq_crc: u32,
 }
 
@@ -81,7 +76,9 @@ impl UpgradeInfo {
     pub fn from_flash<S: NorFlash>(storage: &mut S) -> Result<Self> {
         let ota_partition = find_ota_partition(storage)?;
         let mut buffer = [0; 32];
-        storage.read(ota_partition.offset, &mut buffer).map_err(|_| UpgradeError::StorageError)?;
+        storage
+            .read(ota_partition.offset, &mut buffer)
+            .map_err(|_| UpgradeError::StorageError)?;
 
         if let Ok(upgrade_info) = UpgradeInfo::try_from(buffer) {
             return Ok(upgrade_info);
@@ -89,8 +86,8 @@ impl UpgradeInfo {
 
         storage
             .read(ota_partition.offset + SECTOR_SIZE as u32, &mut buffer)
-        .map_err(|_| UpgradeError::StorageError)?;
-        
+            .map_err(|_| UpgradeError::StorageError)?;
+
         UpgradeInfo::try_from(buffer).map_err(|_| UpgradeError::StorageError)
     }
 
@@ -112,14 +109,28 @@ impl UpgradeInfo {
     pub fn save_to_flash<S: NorFlash>(&self, storage: &mut S) -> Result<()> {
         let ota_partition = find_ota_partition(storage)?;
         let buffer: [u8; 32] = (*self).into();
-        
+
         // Write sector 1
-        storage.erase(ota_partition.offset, ota_partition.offset + SECTOR_SIZE as u32).map_err(|_| UpgradeError::StorageError)?;
-        storage.write(ota_partition.offset, &buffer).map_err(|_| UpgradeError::StorageError)?;
+        storage
+            .erase(
+                ota_partition.offset,
+                ota_partition.offset + SECTOR_SIZE as u32,
+            )
+            .map_err(|_| UpgradeError::StorageError)?;
+        storage
+            .write(ota_partition.offset, &buffer)
+            .map_err(|_| UpgradeError::StorageError)?;
 
         // Write sector 2
-        storage.erase(ota_partition.offset + SECTOR_SIZE as u32, ota_partition.offset + 2 * SECTOR_SIZE as u32).map_err(|_| UpgradeError::StorageError)?;
-        storage.write(ota_partition.offset + SECTOR_SIZE as u32, &buffer).map_err(|_| UpgradeError::StorageError)?;
+        storage
+            .erase(
+                ota_partition.offset + SECTOR_SIZE as u32,
+                ota_partition.offset + 2 * SECTOR_SIZE as u32,
+            )
+            .map_err(|_| UpgradeError::StorageError)?;
+        storage
+            .write(ota_partition.offset + SECTOR_SIZE as u32, &buffer)
+            .map_err(|_| UpgradeError::StorageError)?;
         Ok(())
     }
 }
@@ -141,7 +152,7 @@ impl TryFrom<[u8; 32]> for UpgradeInfo {
         let label = value[4..24].try_into().unwrap();
         let state = AppOTAState::try_from(u32::from_le_bytes(value[24..28].try_into().unwrap()))?;
         let seq_crc = u32::from_le_bytes(value[28..32].try_into().unwrap());
-        
+
         if seq_crc == esp_crc(&seq.to_le_bytes()) {
             Ok(Self {
                 seq,
