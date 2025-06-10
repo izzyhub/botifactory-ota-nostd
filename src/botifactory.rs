@@ -56,7 +56,13 @@ where
     client: HttpClient<'a, T, D>,
 }
 
-impl<T: embedded_nal_async::TcpConnect, D: embedded_nal_async::Dns> BotifactoryClient<'_, T, D> {
+impl<'a, T: embedded_nal_async::TcpConnect, D: embedded_nal_async::Dns>
+    BotifactoryClient<'a, T, D>
+{
+    pub fn new(url: String, client: HttpClient<'a, T, D>) -> BotifactoryClient<'a, T, D> {
+        Self { url, client }
+    }
+
     pub async fn read_version(mut self) -> Result<Version> {
         let mut buffer = [0u8; 4096];
         debug!("building request");
