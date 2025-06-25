@@ -102,6 +102,7 @@ dependencies = [
 [[package]]
 name = "botifactory-types"
 version = "0.1.0"
+source = "git+https://github.com/izzyhub/botifactory-types#ab834be4a6e9c09de9bd6e6b8be7352d4ccaaf3e"
 dependencies = [
  "heapless 0.8.0",
  "semver",
