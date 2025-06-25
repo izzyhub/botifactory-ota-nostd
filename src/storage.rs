@@ -1,10 +1,11 @@
 use crate::error::{Result, UpgradeError};
 use crate::partition::find_inactive_partition;
+use crate::partition::find_running_partition;
 use crate::upgrade_data::{AppOTAState, UpgradeInfo};
 use core::sync::atomic::Ordering;
-use defmt::{debug, error, info, warn};
 use embedded_io_async::Read;
 use embedded_storage::nor_flash::NorFlash;
+use log::{debug, error, info, warn};
 use portable_atomic::AtomicBool;
 
 /// Size of a flash sector
@@ -12,23 +13,46 @@ const SECTOR_SIZE: usize = 4096;
 
 static IS_SAVING: AtomicBool = AtomicBool::new(false);
 
-pub async fn save_new_fw<S: NorFlash, R: Read>(
-    storage: &mut S,
-    mut binary_reader: R,
-) -> Result<()> {
+pub async fn save_new_fw<S: NorFlash, R: Read>(storage: &mut S, binary_reader: R) -> Result<()> {
     if IS_SAVING.swap(true, Ordering::SeqCst) {
         info!("download already in progress");
         return Err(UpgradeError::DLInProgress);
     }
 
-    let upgrade_info = UpgradeInfo::from_flash(storage)?;
+    let res = save_new_fw_internal(storage, binary_reader).await;
+    IS_SAVING.store(false, Ordering::SeqCst);
+    res
+}
+async fn save_new_fw_internal<S: NorFlash, R: Read>(
+    storage: &mut S,
+    mut binary_reader: R,
+) -> Result<()> {
+    debug!("starting download");
+
+    let upgrade_info = match UpgradeInfo::from_flash(storage) {
+        Ok(info) => info,
+        Err(e) => {
+            return Err(e);
+        }
+    };
 
     if !upgrade_info.is_valid() {
-        info!("booting into new fw.");
+        warn!("booting into new fw.");
         return Err(UpgradeError::BootingIntoNewFW);
     }
+    let _ = find_running_partition(storage, upgrade_info.seq)?;
     let inactive_partition = find_inactive_partition(storage, upgrade_info.seq)?;
 
+    debug!(
+        "erasing: from {:x} to {:x}",
+        inactive_partition.offset,
+        inactive_partition.offset + inactive_partition.size as u32
+    );
+    debug!(
+        "erasing: from {} to {}",
+        inactive_partition.offset,
+        inactive_partition.offset + inactive_partition.size as u32
+    );
     storage
         .erase(
             inactive_partition.offset,
@@ -51,6 +75,7 @@ pub async fn save_new_fw<S: NorFlash, R: Read>(
                 .map_err(|_| UpgradeError::StorageError)?;
             if size == 0 {
                 done_reading = true;
+                break;
             }
             amount_read += size;
         }
@@ -60,7 +85,7 @@ pub async fn save_new_fw<S: NorFlash, R: Read>(
 
         storage
             .write(
-                inactive_partition.offset + amount_read as u32,
+                inactive_partition.offset + saved_len as u32,
                 &write_buffer[0..amount_read],
             )
             .map_err(|_| UpgradeError::StorageError)?;

@@ -1,13 +1,31 @@
 use crate::error::{Result, UpgradeError};
 use embedded_storage::nor_flash::NorFlash;
-use esp_partition_table::{AppPartitionType, PartitionEntry, PartitionTable, PartitionType};
-//use defmt::{debug, info};
+use esp_partition_table::{
+    AppPartitionType, DataPartitionType, PartitionEntry, PartitionTable, PartitionType,
+};
+use log::{debug, info};
 
 pub fn find_ota_partition<S: NorFlash>(storage: &mut S) -> Result<PartitionEntry> {
     let table = PartitionTable::default();
 
     for partition in table.iter_nor_flash(storage, false).flatten() {
-        if let PartitionType::App(AppPartitionType::Ota(_)) = partition.type_ {
+        if let PartitionType::App(partition_type) = partition.type_ {
+            match partition_type {
+                AppPartitionType::Factory => {
+                    debug!("app type: factory");
+                }
+                AppPartitionType::Ota(n) => {
+                    debug!("app type: Ota({})", n);
+                }
+                AppPartitionType::Test => {
+                    debug!("app type: Test");
+                }
+            }
+        }
+        if let PartitionType::Data(partition_type) = partition.type_ {
+            debug!("data type: {}", (partition_type as u8));
+        }
+        if let PartitionType::Data(DataPartitionType::Ota) = partition.type_ {
             return Ok(partition);
         }
     }
@@ -16,18 +34,24 @@ pub fn find_ota_partition<S: NorFlash>(storage: &mut S) -> Result<PartitionEntry
 }
 
 pub fn find_running_partition<S: NorFlash>(storage: &mut S, seq: u32) -> Result<PartitionEntry> {
-    let parition_number = (seq % 2) as u8;
+    let partition_number = ((seq + 1) % 2) as u8;
+    debug!("running partition_number: {}", partition_number);
+    debug!("running seq: {}", seq);
     find_partition_by_type(
         storage,
-        PartitionType::App(AppPartitionType::Ota(parition_number)),
+        PartitionType::App(AppPartitionType::Ota(partition_number)),
     )
 }
 
 pub fn find_inactive_partition<S: NorFlash>(storage: &mut S, seq: u32) -> Result<PartitionEntry> {
-    let parition_number = ((seq - 1) % 2) as u8;
+    let partition_number = (seq % 2) as u8;
+    info!("=================================================");
+    debug!("inactive_partition seq: {}", seq);
+    debug!("inactive partition_number: {}", partition_number);
+    info!("=================================================");
     find_partition_by_type(
         storage,
-        PartitionType::App(AppPartitionType::Ota(parition_number)),
+        PartitionType::App(AppPartitionType::Ota(partition_number)),
     )
 }
 

@@ -1,8 +1,8 @@
 use crate::alloc::string::ToString;
 use alloc::str::Utf8Error;
 use alloc::string::String;
-use defmt::error;
 use esp_partition_table::NorFlashOpError;
+use log::error;
 use semver::Error as SemverError;
 use thiserror::Error;
 
@@ -42,7 +42,7 @@ pub enum UpgradeError {
 
 impl From<reqwless::Error> for UpgradeError {
     fn from(error: reqwless::Error) -> Self {
-        error!("network error: {}", error);
+        error!("network error: {:?}", error);
         Self::RequestError
     }
 }

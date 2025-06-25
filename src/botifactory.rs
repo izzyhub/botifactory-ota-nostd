@@ -2,14 +2,14 @@ use crate::error::{Result, UpgradeError};
 use crate::storage::save_new_fw;
 use alloc::format;
 use botifactory_types::ReleaseBody;
-use defmt::debug;
 use embedded_nal_async::{Dns, TcpConnect};
 use embedded_storage::nor_flash::NorFlash;
+use log::debug;
 use reqwless::client::HttpClient;
 use reqwless::request::RequestBuilder;
 use semver::Version;
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
 
 pub struct BotifactoryUrlBuilder {
     pub server_url: String,
@@ -18,11 +18,11 @@ pub struct BotifactoryUrlBuilder {
 }
 
 impl BotifactoryUrlBuilder {
-    pub fn new(server_url: String, project_name: String, channel_name: String) -> Self {
+    pub fn new(server_url: &str, project_name: &str, channel_name: &str) -> Self {
         Self {
-            server_url,
-            project_name,
-            channel_name,
+            server_url: server_url.to_string(),
+            project_name: project_name.to_string(),
+            channel_name: channel_name.to_string(),
         }
     }
     pub fn latest(self) -> String {
@@ -63,9 +63,9 @@ impl<'a, T: embedded_nal_async::TcpConnect, D: embedded_nal_async::Dns>
         Self { url, client }
     }
 
-    pub async fn read_version(mut self) -> Result<Version> {
+    pub async fn read_version(&mut self) -> Result<Version> {
         let mut buffer = [0u8; 4096];
-        debug!("building request");
+        debug!("building (json) request");
         let headers = [("accept", "application/json")];
         let mut request = self
             .client
@@ -80,7 +80,7 @@ impl<'a, T: embedded_nal_async::TcpConnect, D: embedded_nal_async::Dns>
             .send(&mut buffer)
             .await
             .map_err(UpgradeError::from)?;
-        debug!("status code: {}", response.status);
+        debug!("status code: {:?}", response.status);
         if !response.status.is_successful() {
             return Err(UpgradeError::RequestError);
         }
@@ -90,20 +90,20 @@ impl<'a, T: embedded_nal_async::TcpConnect, D: embedded_nal_async::Dns>
             .read_to_end()
             .await
             .map_err(UpgradeError::from)?;
-        debug!("response read");
 
         let content = core::str::from_utf8(response_body)?;
-        debug!("content read");
 
+        debug!("content: {}", content);
         let (release_response, _size): (ReleaseBody, usize) =
             serde_json_core::from_str(content).map_err(UpgradeError::from)?;
 
+        debug!("version: {}", release_response.release.version);
         Ok(release_response.release.version)
     }
 
-    pub async fn read_binary<S: NorFlash>(mut self, storage: &mut S) -> Result<()> {
+    pub async fn read_binary<S: NorFlash>(&mut self, storage: &mut S) -> Result<()> {
         let mut buffer = [0u8; 4096];
-        debug!("building request");
+        debug!("building (binary) request");
         let headers = [("accept", "application/octet-stream")];
 
         let mut request = self
@@ -119,7 +119,7 @@ impl<'a, T: embedded_nal_async::TcpConnect, D: embedded_nal_async::Dns>
             .send(&mut buffer)
             .await
             .map_err(UpgradeError::from)?;
-        debug!("status code: {}", response.status);
+        debug!("status code: {:?}", response.status);
         if !response.status.is_successful() {
             return Err(UpgradeError::RequestError);
         }

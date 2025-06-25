@@ -3,7 +3,6 @@ use crate::partition::find_ota_partition;
 use crate::seq_crc::esp_crc;
 use alloc::fmt::Display;
 use core::fmt::Formatter;
-use defmt::Format;
 use embedded_storage::nor_flash::NorFlash;
 
 const SECTOR_SIZE: usize = 0x1000;
@@ -11,7 +10,7 @@ const SECTOR_SIZE: usize = 0x1000;
 /// These aren't really arbitrary/crate invented states.
 /// They come from the espressive bootloader
 /// [documented here](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/ota.html)
-#[derive(Debug, Format, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum AppOTAState {
     /// Monitor the first boot.
     /// In bootloader this state is changed to ESP_OTA_IMG_PENDING_VERIFY.
